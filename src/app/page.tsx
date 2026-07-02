@@ -1,14 +1,9 @@
 "use client";
 
-// Declaração de tipo para o bwip-js resolver o erro de compilação do TypeScript na Vercel
-declare module 'bwip-js' {
-  const bwipjs: any;
-  export default bwipjs;
-}
-
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { jsPDF } from 'jspdf';
+// @ts-ignore - Ignora a verificação estrita de tipos no build da Vercel
 import bwipjs from 'bwip-js';
 
 interface LocalizacaoRow {
