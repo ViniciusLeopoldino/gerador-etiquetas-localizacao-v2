@@ -1,5 +1,11 @@
 "use client";
 
+// Declaração de tipo para o bwip-js resolver o erro de compilação do TypeScript na Vercel
+declare module 'bwip-js' {
+  const bwipjs: any;
+  export default bwipjs;
+}
+
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { jsPDF } from 'jspdf';
@@ -173,10 +179,10 @@ export default function GeradorEtiquetasLocalizacao() {
           // --- CÓDIGO DE BARRAS PRINCIPAL (SEM TEXTO LEVÍVEL ABAIXO) ---
           doc.addImage(barcodeImg, 'PNG', 2, hSuperior + 2, 48, 14);
 
-          // --- CÁLCULO DE PROPORÇÃO DA LOGO (GARANTE QUE CAIBA SEM DISTORCER) ---
+          // --- CÁLCULO DE PROPORÇÃO DA LOGO ---
           const xLimiteLogo = 53;
-          const larguraMaxLogo = xInicioSeta - xLimiteLogo - 2; // ~21.5mm livre
-          const alturaMaxLogo = 30 - hSuperior - 3; // ~15mm livre
+          const larguraMaxLogo = xInicioSeta - xLimiteLogo - 2; 
+          const alturaMaxLogo = 30 - hSuperior - 3; 
 
           let novaLarguraLogo = larguraMaxLogo;
           let novaAlturaLogo = (logoImg.height * larguraMaxLogo) / logoImg.width;
@@ -186,7 +192,6 @@ export default function GeradorEtiquetasLocalizacao() {
             novaLarguraLogo = (logoImg.width * alturaMaxLogo) / logoImg.height;
           }
 
-          // Centralização exata dentro do quadrado disponível
           const xLogoCentrado = xLimiteLogo + ((larguraMaxLogo - novaLarguraLogo) / 2) + 1;
           const yLogoCentrado = hSuperior + 1.5 + ((alturaMaxLogo - novaAlturaLogo) / 2);
 
@@ -211,7 +216,7 @@ export default function GeradorEtiquetasLocalizacao() {
     <div className="min-h-screen bg-slate-900 text-white p-4 flex flex-col items-center justify-center">
       <div className="w-full max-w-xl bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
         <h1 className="text-xl font-black text-center mb-1">Emissor de Etiquetas de Localização</h1>
-        <p className="text-xs text-slate-400 mb-6 text-center">Formato 100mm x 30mm</p>
+        <p className="text-xs text-slate-400 mb-6 text-center">Formato 100mm x 30mm | Topo Reduzido e Redimensionamento de Logo</p>
         
         {error && <div className="mb-4 p-2 bg-red-500/20 border border-red-500 text-red-200 text-xs rounded text-center">{error}</div>}
 
