@@ -211,7 +211,7 @@ export default function GeradorEtiquetasLocalizacao() {
     <div className="min-h-screen bg-slate-900 text-white p-4 flex flex-col items-center justify-center">
       <div className="w-full max-w-xl bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
         <h1 className="text-xl font-black text-center mb-1">Emissor de Etiquetas de Localização</h1>
-        <p className="text-xs text-slate-400 mb-6 text-center">Formato 100mm x 30mm | Topo Reduzido e Redimensionamento de Logo</p>
+        <p className="text-xs text-slate-400 mb-6 text-center">Formato 100mm x 30mm</p>
         
         {error && <div className="mb-4 p-2 bg-red-500/20 border border-red-500 text-red-200 text-xs rounded text-center">{error}</div>}
 
