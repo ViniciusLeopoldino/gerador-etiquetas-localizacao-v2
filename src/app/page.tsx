@@ -7,7 +7,7 @@ import { jsPDF } from 'jspdf';
 import bwipjs from 'bwip-js';
 
 interface LocalizacaoRow {
-  LOCALIZACAO: string; // Ex: R0100100101
+  LOCALIZACAO_BRUTA: string; // Ex: R0100100101 ou qualquer texto corrido
   QUANTIDADE?: string;
 }
 
@@ -16,13 +16,21 @@ export default function GeradorEtiquetasLocalizacao() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [manual, setManual] = useState({ rua: '', modulo: '', andar: '', comp: '', qtd: '1' });
+  const [isPadrao, setIsPadrao] = useState(true); // Flag de "Etiqueta Padrão"
 
-  const construirEndereco = (r: string, m: string, a: string, c: string) => {
-    const ruaFmt = r.toUpperCase().startsWith('R') ? r.toUpperCase() : `R${r.padStart(2, '0')}`;
-    const modFmt = m.padStart(3, '0');
-    const andFmt = a.padStart(3, '0');
-    const compFmt = c.padStart(2, '0');
-    return `${ruaFmt}${modFmt}${andFmt}${compFmt}`;
+  // Função para aplicar a máscara 3-3-3-2 dinamicamente
+  const formatarComoPadrao = (texto: string) => {
+    const limpo = texto.replace(/\s+/g, '');
+    const p1 = limpo.substring(0, 3);
+    const p2 = limpo.substring(3, 6);
+    const p3 = limpo.substring(6, 9);
+    const p4 = limpo.substring(9, 11);
+
+    let resultado = p1;
+    if (p2) resultado += ` - ${p2}`;
+    if (p3) resultado += ` - ${p3}`;
+    if (p4) resultado += ` - ${p4}`;
+    return resultado;
   };
 
   const handleAddManual = () => {
@@ -31,15 +39,11 @@ export default function GeradorEtiquetasLocalizacao() {
       return;
     }
 
-    const localizacaoCompleta = construirEndereco(manual.rua, manual.modulo, manual.andar, manual.comp);
-
-    if (localizacaoCompleta.length !== 11) {
-      setError('Erro ao gerar o padrão de localização. Verifique os valores.');
-      return;
-    }
+    // Junta as entradas dos inputs de forma corrida
+    const localizacaoCorrida = `${manual.rua.trim()}${manual.modulo.trim()}${manual.andar.trim()}${manual.comp.trim()}`;
 
     setCsvData([...csvData, {
-      LOCALIZACAO: localizacaoCompleta,
+      LOCALIZACAO_BRUTA: localizacaoCorrida,
       QUANTIDADE: manual.qtd || '1'
     }]);
 
@@ -50,12 +54,13 @@ export default function GeradorEtiquetasLocalizacao() {
   const downloadTemplate = () => {
     const csvContent = "\uFEFFLOCALIZACAO;QUANTIDADE\n" +
                        "R0100100101;1\n" +
-                       "R0100100201;1";
+                       "0500500202;3\n" +
+                       "ABCDEFGHIJK;2";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", "modelo_localizacoes.csv");
+    link.setAttribute("download", "modelo_etiqueta_corrida.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -67,10 +72,15 @@ export default function GeradorEtiquetasLocalizacao() {
       Papa.parse(file, {
         header: true, skipEmptyLines: true, delimiter: ";",
         complete: (results: any) => {
-          const validData = results.data.map((row: any) => ({
-            LOCALIZACAO: String(row.LOCALIZACAO || '').trim().toUpperCase(),
-            QUANTIDADE: String(row.QUANTIDADE || '1').trim()
-          })).filter((row: any) => row.LOCALIZACAO.length > 0);
+          const validData = results.data.map((row: any) => {
+            const loc = String(row.LOCALIZACAO || '').toUpperCase().trim();
+            if (!loc) return null;
+
+            return {
+              LOCALIZACAO_BRUTA: loc,
+              QUANTIDADE: String(row.QUANTIDADE || '1').trim()
+            };
+          }).filter((row: any) => row !== null);
 
           setCsvData(prev => [...prev, ...validData]);
           event.target.value = '';
@@ -138,23 +148,21 @@ export default function GeradorEtiquetasLocalizacao() {
 
       for (const row of csvData) {
         const loopQtd = parseInt(row.QUANTIDADE || '1', 10);
-        const loc = row.LOCALIZACAO;
-
-        const ruaNum = loc.substring(1, 3);
-        const moduloNum = loc.substring(3, 6);
-        const andarStr = loc.substring(6, 9);
-        const compNum = loc.substring(9, 11);
+        const locBruta = row.LOCALIZACAO_BRUTA;
         
-        const locFormatada = `R${ruaNum} - ${moduloNum} - ${andarStr} - ${compNum}`;
+        // Define o texto que irá impresso baseado no Flag selecionado na interface
+        const locFormatada = isPadrao ? formatarComoPadrao(locBruta) : locBruta;
         
-        const andarInt = parseInt(andarStr, 10);
+        // Determinação do Andar para a Seta (Trabalha na posição do bloco do andar se for padrão, ou tenta ler o meio da string)
+        const andarTexto = isPadrao && locBruta.length >= 9 ? locBruta.substring(6, 9) : locBruta;
+        const andarInt = parseInt(andarTexto.replace(/\D/g, ''), 10);
         const direcaoSeta = andarInt === 1 ? 'down' : 'up';
 
         const larguraSeta = 12; 
         const xInicioSeta = 100 - larguraSeta - 2; 
         const hSuperior = 12; 
 
-        const barcodeImg = await generateBarcode(loc);
+        const barcodeImg = await generateBarcode(locBruta);
         for (let i = 0; i < loopQtd; i++) {
           if (!firstPage) doc.addPage();
           firstPage = false;
@@ -168,10 +176,10 @@ export default function GeradorEtiquetasLocalizacao() {
 
           // --- TEXTO PRINCIPAL DA LOCALIZAÇÃO ---
           doc.setFont("Helvetica", "bold");
-          doc.setFontSize(26); 
+          doc.setFontSize(locFormatada.length > 18 ? 18 : 26); 
           doc.text(locFormatada, xInicioSeta / 2, 9, { align: 'center' });
 
-          // --- CÓDIGO DE BARRAS PRINCIPAL (SEM TEXTO LEVÍVEL ABAIXO) ---
+          // --- CÓDIGO DE BARRAS PRINCIPAL ---
           doc.addImage(barcodeImg, 'PNG', 2, hSuperior + 2, 48, 14);
 
           // --- CÁLCULO DE PROPORÇÃO DA LOGO ---
@@ -211,7 +219,19 @@ export default function GeradorEtiquetasLocalizacao() {
     <div className="min-h-screen bg-slate-900 text-white p-4 flex flex-col items-center justify-center">
       <div className="w-full max-w-xl bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
         <h1 className="text-xl font-black text-center mb-1">Emissor de Etiquetas de Localização</h1>
-        <p className="text-xs text-slate-400 mb-6 text-center">Formato 100mm x 30mm</p>
+        <p className="text-xs text-slate-400 mb-4 text-center">Formato 100mm x 30mm</p>
+
+        {/* FLAG/SWITCH DA CONFIGURAÇÃO DA ETIQUETA */}
+        <div className="mb-6 flex items-center justify-between p-3 bg-slate-950/40 rounded-xl border border-slate-700/50">
+          <div className="flex flex-col">
+            <span className="text-sm font-bold">Etiqueta Padrão</span>
+            <span className="text-[11px] text-slate-400">Ativa a máscara de formatação (3 - 3 - 3 - 2)</span>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={isPadrao} onChange={() => setIsPadrao(!isPadrao)} className="sr-only peer" />
+            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
         
         {error && <div className="mb-4 p-2 bg-red-500/20 border border-red-500 text-red-200 text-xs rounded text-center">{error}</div>}
 
@@ -238,8 +258,7 @@ export default function GeradorEtiquetasLocalizacao() {
             </div>
             {manual.rua && (
               <div className="mt-3 flex justify-between px-1 text-xs font-mono">
-                <span className="text-slate-400">Código Gerado: <strong className="text-white">{construirEndereco(manual.rua, manual.modulo, manual.andar, manual.comp)}</strong></span>
-                <span className="text-slate-400">Direção: {parseInt(manual.andar || '0', 10) === 1 ? <strong className="text-red-400">⬇ ABAIXO</strong> : <strong className="text-emerald-400">⬆ ACIMA</strong>}</span>
+                <span className="text-slate-400">Preview no PDF: <strong className="text-white">{isPadrao ? formatarComoPadrao(`${manual.rua}${manual.modulo}${manual.andar}${manual.comp}`) : `${manual.rua}${manual.modulo}${manual.andar}${manual.comp}`.toUpperCase()}</strong></span>
               </div>
             )}
           </div>
