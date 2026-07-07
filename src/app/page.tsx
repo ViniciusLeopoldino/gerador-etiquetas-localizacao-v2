@@ -7,7 +7,7 @@ import { jsPDF } from 'jspdf';
 import bwipjs from 'bwip-js';
 
 interface LocalizacaoRow {
-  LOCALIZACAO_BRUTA: string; // Ex: R0100100101 ou qualquer texto corrido
+  LOCALIZACAO_BRUTA: string; 
   QUANTIDADE?: string;
 }
 
@@ -16,9 +16,8 @@ export default function GeradorEtiquetasLocalizacao() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [manual, setManual] = useState({ rua: '', modulo: '', andar: '', comp: '', qtd: '1' });
-  const [isPadrao, setIsPadrao] = useState(true); // Flag de "Etiqueta Padrão"
+  const [isPadrao, setIsPadrao] = useState(true); 
 
-  // Função para aplicar a máscara 3-3-3-2 dinamicamente
   const formatarComoPadrao = (texto: string) => {
     const limpo = texto.replace(/\s+/g, '');
     const p1 = limpo.substring(0, 3);
@@ -39,7 +38,6 @@ export default function GeradorEtiquetasLocalizacao() {
       return;
     }
 
-    // Junta as entradas dos inputs de forma corrida
     const localizacaoCorrida = `${manual.rua.trim()}${manual.modulo.trim()}${manual.andar.trim()}${manual.comp.trim()}`;
 
     setCsvData([...csvData, {
@@ -150,13 +148,24 @@ export default function GeradorEtiquetasLocalizacao() {
         const loopQtd = parseInt(row.QUANTIDADE || '1', 10);
         const locBruta = row.LOCALIZACAO_BRUTA;
         
-        // Define o texto que irá impresso baseado no Flag selecionado na interface
         const locFormatada = isPadrao ? formatarComoPadrao(locBruta) : locBruta;
         
-        // Determinação do Andar para a Seta (Trabalha na posição do bloco do andar se for padrão, ou tenta ler o meio da string)
-        const andarTexto = isPadrao && locBruta.length >= 9 ? locBruta.substring(6, 9) : locBruta;
-        const andarInt = parseInt(andarTexto.replace(/\D/g, ''), 10);
-        const direcaoSeta = andarInt === 1 ? 'down' : 'up';
+        // --- NOVA LÓGICA DE DIRECIONAMENTO DA SETA ---
+        let direcaoSeta: 'up' | 'down' = 'up';
+        
+        // Verifica se o início da string corresponde a R01, R02, R03 ou R04
+        const prefixoRua = locBruta.substring(0, 3).toUpperCase();
+        const possuiPrefixoValido = ['R01', 'R02', 'R03', 'R04'].includes(prefixoRua);
+
+        if (possuiPrefixoValido) {
+          // Se possui o prefixo, aplica a regra do primeiro andar
+          const andarTexto = locBruta.substring(6, 9);
+          const andarInt = parseInt(andarTexto.replace(/\D/g, ''), 10);
+          direcaoSeta = andarInt === 1 ? 'down' : 'up';
+        } else {
+          // Se iniciar diferente, força obrigatoriamente a seta para cima
+          direcaoSeta = 'up';
+        }
 
         const larguraSeta = 12; 
         const xInicioSeta = 100 - larguraSeta - 2; 
@@ -221,7 +230,6 @@ export default function GeradorEtiquetasLocalizacao() {
         <h1 className="text-xl font-black text-center mb-1">Emissor de Etiquetas de Localização</h1>
         <p className="text-xs text-slate-400 mb-4 text-center">Formato 100mm x 30mm</p>
 
-        {/* FLAG/SWITCH DA CONFIGURAÇÃO DA ETIQUETA */}
         <div className="mb-6 flex items-center justify-between p-3 bg-slate-950/40 rounded-xl border border-slate-700/50">
           <div className="flex flex-col">
             <span className="text-sm font-bold">Etiqueta Padrão</span>
